@@ -42,6 +42,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
@@ -54,6 +56,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -117,10 +120,27 @@ void configureHC05(){
 	HAL_UART_Receive(&huart1, (uint8_t*)resp, sizeof(resp), 200);
 	HAL_Delay(500);
 
-
-
-
 }
+
+void convertInput(uint32_t x_in, uint32_t y_in, uint32_t* cmd) {
+
+	int x = x_in - 2048;
+	int y = y_in - 2048;
+
+	if (abs(x) + abs(y) < 50) {
+		x = 0;
+		y = 0;
+	}
+	// we could determine direction by raw y value, but this
+	// method (differential drive) allows for greater maneuverability
+	// by turning in place
+
+	cmd[0] = ((x + y) > 0) ? 1 : 0;
+	cmd[1] = abs((x + y)) * (255 / 2047);
+	cmd[2] = ((y - x) > 0) ? 1 : 0;
+	cmd[3] = abs((y - x)) * (255 / 2047);
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -154,6 +174,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_USART1_UART_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -162,8 +183,27 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  uint32_t adc_x;
+	  uint32_t adc_y;
+	  HAL_ADC_Start(&hadc1);
 
+	  HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+	  adc_x = HAL_ADC_GetValue(&hadc1);
 
+	  HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+	  adc_y = HAL_ADC_GetValue(&hadc1);
+
+	  HAL_ADC_Stop(&hadc1);
+
+	  //printf("X:%lu Y:%lu\r\n", adc_val1, adc_val2);
+
+	  uint8_t cmd[4];
+	  convertInput(adc_x, adc_y, cmd);
+	  HAL_UART_Transmit(&huart1, cmd, 4, 10);
+
+	  HAL_Delay(50);
+
+#if 0
 	# if CONFIGURE_HC05
 	  HAL_GPIO_WritePin(HC05_EN_GPIO_Port, HC05_EN_Pin, GPIO_PIN_SET);  // set EN HIGH
 	  configureHC05();
@@ -176,7 +216,7 @@ int main(void)
 	  HAL_UART_Transmit(&huart1, msg, strlen((char*)msg), 10);
 	  HAL_Delay(1000);
 
-
+#endif
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -229,6 +269,65 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.ScanConvMode = ENABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 2;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_84CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = 2;
+  sConfig.SamplingTime = ADC_SAMPLETIME_84CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+	Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -339,6 +438,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(HC05_EN_GPIO_Port, &GPIO_InitStruct);
+
+  // configuring adc in for analog stick (PA0 PA1)
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
