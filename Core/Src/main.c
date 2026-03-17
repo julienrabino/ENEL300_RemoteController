@@ -233,7 +233,7 @@ int main(void)
 	        HAL_UART_Transmit(&huart1, &cmd[i], 1, HAL_MAX_DELAY);
 	        HAL_Delay(1); // 1 ms delay
 	    }
-	  HAL_Delay(50);
+	  HAL_Delay(100);
 #endif
 #endif
 
