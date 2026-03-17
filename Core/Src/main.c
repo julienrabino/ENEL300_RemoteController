@@ -122,28 +122,32 @@ void configureHC05(){
 }
 
 
-
-
+uint32_t abs(int n) {return ((n < 0) ? -n : n);}
 
 
 void convertInput(uint32_t x_in, uint32_t y_in, uint8_t* cmd) {
 
-    int x = x_in - 3035;
-    int y = y_in - 3035;
+    int x = x_in - 3652 + 600 - 100;
+    int y = -y_in + 2532 + 600 + 100;
 
-    if (abs(x) + abs(y) < 50) {
-        x = 0;
-        y = 0;
-    }
+    if (abs(x) < (5)) x = 0; // the 16 accounts for shifting, 5 is the deadzone we see in terminal
+    if (abs(y) < (5)) y = 0;
 
     int left  = x + y;
     int right = y - x;
 
+    if (left >= 4096) (left = 4096);
+    if (right >= 4096) (right = 4096);
+    if (left <= -4096) (left = -4096);
+    if (right <= -4096) (right = -4096);
+
+
     cmd[0] = (left > 0) ? 1 : 0;
-    cmd[1] = (uint8_t)((abs(left) * 255) / 2047);
+    cmd[1] = cmd[0] == 1 ? (uint8_t)((abs(left) >> 4)) : (uint8_t)(255 - (abs(left) >> 4));
 
     cmd[2] = (right > 0) ? 1 : 0;
-    cmd[3] = (uint8_t)((abs(right) * 255) / 2047);
+    cmd[3] = cmd[2] == 1 ? (uint8_t)((abs(right) >> 4)) : (uint8_t)(255 - (abs(right) >> 4));
+
 }
 /* USER CODE END 0 */
 
