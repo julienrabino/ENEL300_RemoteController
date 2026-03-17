@@ -27,7 +27,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define CONFIGURE_HC05 0  // 1 = AT mode, 0 = Data mode
+#define CONFIGURE_HC05 0 // 1 = AT mode, 0 = Data mode
 
 /* USER CODE END PTD */
 
@@ -66,7 +66,6 @@ static void MX_ADC1_Init(void);
 
 void configureHC05(){
 	char resp[50] = {0};
-	printf("\r\n--- Testing HC-05 Connection ---\r\n");
 
 	    // 1. Send AT
 	    HAL_UART_Transmit(&huart1, (uint8_t*)"AT\r\n", 4, 1000);
@@ -122,25 +121,30 @@ void configureHC05(){
 
 }
 
-void convertInput(uint32_t x_in, uint32_t y_in, uint32_t* cmd) {
 
-	int x = x_in - 2048;
-	int y = y_in - 2048;
 
-	if (abs(x) + abs(y) < 50) {
-		x = 0;
-		y = 0;
-	}
-	// we could determine direction by raw y value, but this
-	// method (differential drive) allows for greater maneuverability
-	// by turning in place
 
-	cmd[0] = ((x + y) > 0) ? 1 : 0;
-	cmd[1] = abs((x + y)) * (255 / 2047);
-	cmd[2] = ((y - x) > 0) ? 1 : 0;
-	cmd[3] = abs((y - x)) * (255 / 2047);
+
+
+void convertInput(uint32_t x_in, uint32_t y_in, uint8_t* cmd) {
+
+    int x = x_in - 3035;
+    int y = y_in - 3035;
+
+    if (abs(x) + abs(y) < 50) {
+        x = 0;
+        y = 0;
+    }
+
+    int left  = x + y;
+    int right = y - x;
+
+    cmd[0] = (left > 0) ? 1 : 0;
+    cmd[1] = (uint8_t)((abs(left) * 255) / 2047);
+
+    cmd[2] = (right > 0) ? 1 : 0;
+    cmd[3] = (uint8_t)((abs(right) * 255) / 2047);
 }
-
 /* USER CODE END 0 */
 
 /**
@@ -183,6 +187,26 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+# if CONFIGURE_HC05
+  HAL_GPIO_WritePin(HC05_EN_GPIO_Port, HC05_EN_Pin, GPIO_PIN_SET);  // set EN HIGH
+  configureHC05();
+
+	// important: after running this ONCE, change CONFIGURE_HC05 to 0 and also the baud rate to 9600.
+  while (1){} // stop execution so normal controller code doesn't run
+#endif
+  HAL_GPIO_WritePin(HC05_EN_GPIO_Port, HC05_EN_Pin, GPIO_PIN_RESET);  // set EN LOW
+# if 0
+  uint8_t cmd[4] = {0,100,0,100};
+  HAL_UART_Transmit(&huart1, cmd, 4, HAL_MAX_DELAY);
+  printf("cmd array: ");
+  for (int i = 0; i < 4; i++) {
+      printf("%02X ", cmd[i]);  // %02X prints two-digit hex with leading zero
+  }
+  printf("\r\n");
+  HAL_Delay(100);
+#endif
+#if 1
+
 	  uint32_t adc_x;
 	  uint32_t adc_y;
 	  HAL_ADC_Start(&hadc1);
@@ -199,23 +223,24 @@ int main(void)
 
 	  uint8_t cmd[4];
 	  convertInput(adc_x, adc_y, cmd);
-	  HAL_UART_Transmit(&huart1, cmd, 4, 10);
-
+	 // printf("Raw X: %lu, Raw Y: %lu\r\n", adc_x, adc_y);
+#if 1
+	    for (int i = 0; i < 4; i++) {
+	        printf("%d ", cmd[i]);  // %02X prints two-digit hex with leading zero
+	    }
+	    printf("\r\n");
+	    for(int i = 0; i < 4; i++){
+	        HAL_UART_Transmit(&huart1, &cmd[i], 1, HAL_MAX_DELAY);
+	        HAL_Delay(1); // 1 ms delay
+	    }
 	  HAL_Delay(50);
+#endif
+#endif
 
 #if 0
-	# if CONFIGURE_HC05
-	  HAL_GPIO_WritePin(HC05_EN_GPIO_Port, HC05_EN_Pin, GPIO_PIN_SET);  // set EN HIGH
-	  configureHC05();
-
-		// important: after running this ONCE, change CONFIGURE_HC05 to 0 and also the baud rate to 9600.
-	  while (1){} // stop execution so normal controller code doesn't run
-	#endif
-
 	  uint8_t msg[] = "Hello Car!\r\n";
 	  HAL_UART_Transmit(&huart1, msg, strlen((char*)msg), 10);
 	  HAL_Delay(1000);
-
 #endif
     /* USER CODE END WHILE */
 
@@ -318,12 +343,13 @@ static void MX_ADC1_Init(void)
     Error_Handler();
   }
 
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = 2;
-  sConfig.SamplingTime = ADC_SAMPLETIME_84CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
-	Error_Handler();
+    Error_Handler();
   }
   /* USER CODE BEGIN ADC1_Init 2 */
   /* USER CODE END ADC1_Init 2 */
@@ -435,15 +461,9 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : HC05_EN_Pin */
   GPIO_InitStruct.Pin = HC05_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(HC05_EN_GPIO_Port, &GPIO_InitStruct);
-
-  // configuring adc in for analog stick (PA0 PA1)
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
-  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
