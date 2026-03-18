@@ -222,10 +222,12 @@ int main(void)
 	  convertInput(adc_x, adc_y, cmd);
 	 // printf("Raw X: %lu, Raw Y: %lu\r\n", adc_x, adc_y);
 #if 1
-	    for (int i = 0; i < 4; i++) {
-	        printf("%d ", cmd[i]);  // %02X prints two-digit hex with leading zero
-	    }
-	    printf("\r\n");
+        printf("L Dir: %d   ", cmd[0]);
+        printf("L Speed: %d   ", cmd[1]);
+        printf("R Dir: %d   ", cmd[2]);
+        printf("R Speed: %d   ", cmd[3]);
+
+        printf("\r\n");
 	    uint8_t start = START_BYTE;
 	    HAL_UART_Transmit(&huart1, &start, 1, HAL_MAX_DELAY);
 	    for(int i = 0; i < 4; i++){
