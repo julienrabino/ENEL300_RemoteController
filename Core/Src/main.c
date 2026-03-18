@@ -28,6 +28,7 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 #define CONFIGURE_HC05 0 // 1 = AT mode, 0 = Data mode
+#define START_BYTE 0xAA
 
 /* USER CODE END PTD */
 
@@ -91,20 +92,15 @@ void configureHC05(){
 	HAL_Delay(500);
 	memset(resp, 0, sizeof(resp));
 
-	char cmd_pw[] = "AT+PSWD=\"1234\"\r\n";
+	char cmd_pw[] = "AT+PSWD=\"0902\"\r\n";
 	HAL_UART_Transmit(&huart1, (uint8_t*)cmd_pw, strlen(cmd_pw), HAL_MAX_DELAY);
 	HAL_UART_Receive(&huart1, (uint8_t*)resp, sizeof(resp), 200);
 	printf("Password Response: %s\r\n", resp);
 	HAL_Delay(500);
 	memset(resp, 0, sizeof(resp));
 
-#if 0
-	char cmd2[] = "AT+BIND=2025,08,004A3B\r\n";
-	HAL_UART_Transmit(&huart1, (uint8_t*)cmd2, strlen(cmd2), HAL_MAX_DELAY);
-	HAL_UART_Receive(&huart1, (uint8_t*)resp, sizeof(resp), 200);
-	HAL_Delay(500);
-#endif
-	char cmd3[] = "AT+CMODE=1\r\n";
+
+	char cmd3[] = "AT+CMODE=0\r\n";
 	HAL_UART_Transmit(&huart1, (uint8_t*)cmd3, strlen(cmd3), HAL_MAX_DELAY);
 	HAL_UART_Receive(&huart1, (uint8_t*)resp, sizeof(resp), 200);
 	printf("CMode Response: %s\r\n", resp); // Print the "OK"
@@ -118,6 +114,13 @@ void configureHC05(){
 	HAL_UART_Transmit(&huart1, (uint8_t*)cmd4, strlen(cmd4), HAL_MAX_DELAY);
 	HAL_UART_Receive(&huart1, (uint8_t*)resp, sizeof(resp), 200);
 	HAL_Delay(500);
+
+	char cmd5[] = "AT+BIND=2025,08,004EBC\r\n";
+	    HAL_UART_Transmit(&huart1, (uint8_t*)cmd5, strlen(cmd5), HAL_MAX_DELAY);
+	    HAL_UART_Receive(&huart1, (uint8_t*)resp, sizeof(resp), 500);
+	    printf("Bind Response: %s\r\n", resp);
+	    memset(resp, 0, sizeof(resp));
+	    HAL_Delay(500);
 
 }
 
@@ -199,16 +202,6 @@ int main(void)
   while (1){} // stop execution so normal controller code doesn't run
 #endif
   HAL_GPIO_WritePin(HC05_EN_GPIO_Port, HC05_EN_Pin, GPIO_PIN_RESET);  // set EN LOW
-# if 0
-  uint8_t cmd[4] = {0,100,0,100};
-  HAL_UART_Transmit(&huart1, cmd, 4, HAL_MAX_DELAY);
-  printf("cmd array: ");
-  for (int i = 0; i < 4; i++) {
-      printf("%02X ", cmd[i]);  // %02X prints two-digit hex with leading zero
-  }
-  printf("\r\n");
-  HAL_Delay(100);
-#endif
 #if 1
 
 	  uint32_t adc_x;
@@ -233,6 +226,8 @@ int main(void)
 	        printf("%d ", cmd[i]);  // %02X prints two-digit hex with leading zero
 	    }
 	    printf("\r\n");
+	    uint8_t start = START_BYTE;
+	    HAL_UART_Transmit(&huart1, &start, 1, HAL_MAX_DELAY);
 	    for(int i = 0; i < 4; i++){
 	        HAL_UART_Transmit(&huart1, &cmd[i], 1, HAL_MAX_DELAY);
 	        HAL_Delay(1); // 1 ms delay
@@ -241,11 +236,7 @@ int main(void)
 #endif
 #endif
 
-#if 0
-	  uint8_t msg[] = "Hello Car!\r\n";
-	  HAL_UART_Transmit(&huart1, msg, strlen((char*)msg), 10);
-	  HAL_Delay(1000);
-#endif
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
