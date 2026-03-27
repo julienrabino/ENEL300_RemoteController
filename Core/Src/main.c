@@ -29,6 +29,8 @@
 /* USER CODE BEGIN PTD */
 #define CONFIGURE_HC05 0 // 1 = AT mode, 0 = Data mode
 #define START_BYTE 0xAA
+#define TOGGLE_LED 0xCC
+
 
 /* USER CODE END PTD */
 
@@ -448,6 +450,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : SW_Pin */
+  GPIO_InitStruct.Pin = SW_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(SW_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : LD2_Pin */
   GPIO_InitStruct.Pin = LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -462,11 +470,35 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(HC05_EN_GPIO_Port, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+/* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    static uint32_t last_interrupt_time = 0;
+    uint32_t current_time = HAL_GetTick();
+
+    if (GPIO_Pin == GPIO_PIN_4)
+    {
+        if (current_time - last_interrupt_time > 200)
+        {
+            uint8_t toggle = TOGGLE_LED;
+            // Send the toggle command
+            HAL_UART_Transmit(&huart1, &toggle, 1, 10);
+
+            HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+
+            last_interrupt_time = current_time;
+        }
+    }
+}
 int __io_putchar(int ch)
 {
   HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
