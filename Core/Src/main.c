@@ -220,9 +220,17 @@ int main(void)
 
 	  //printf("X:%lu Y:%lu\r\n", adc_val1, adc_val2);
 
-	  uint8_t cmd[4];
-	  convertInput(adc_x, adc_y, cmd);
+	  //uint8_t cmd[4];
+	 // convertInput(adc_x, adc_y, cmd);
 	 // printf("Raw X: %lu, Raw Y: %lu\r\n", adc_x, adc_y);
+
+	   uint8_t cmd[4] = {1, 0xFF, 1, 0xFF};
+
+
+
+
+
+
 #if 1
         printf("L Dir: %d   ", cmd[0]);
         printf("L Speed: %d   ", cmd[1]);
