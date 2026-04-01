@@ -51,7 +51,8 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+static int32_t prev_x = 0;
+ static int32_t prev_y = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -125,34 +126,49 @@ void configureHC05(){
 	    HAL_Delay(500);
 
 }
-
-
-uint32_t abs(int n) {return ((n < 0) ? -n : n);}
-
+int32_t abs32(int32_t n) {
+    return (n < 0) ? -n : n;
+}
 
 void convertInput(uint32_t x_in, uint32_t y_in, uint8_t* cmd) {
 
-    int x = x_in - 3652 + 600 - 100;
-    int y = -y_in + 2532 + 600 + 100;
-
-    if (abs(x) < (5)) x = 0; // the 16 accounts for shifting, 5 is the deadzone we see in terminal
-    if (abs(y) < (5)) y = 0;
-
-    int left  = x + y;
-    int right = y - x;
-
-    if (left >= 4096) (left = 4096);
-    if (right >= 4096) (right = 4096);
-    if (left <= -4096) (left = -4096);
-    if (right <= -4096) (right = -4096);
+    int32_t x = (int32_t)x_in - 2048;
+    int32_t y = (int32_t)y_in - 2048;
 
 
-    cmd[0] = (left > 0) ? 1 : 0;
-    cmd[1] = cmd[0] == 1 ? (uint8_t)((abs(left) >> 4)) : (uint8_t)(255 - (abs(left) >> 4));
 
-    cmd[2] = (right > 0) ? 1 : 0;
-    cmd[3] = cmd[2] == 1 ? (uint8_t)((abs(right) >> 4)) : (uint8_t)(255 - (abs(right) >> 4));
+    x = (x + prev_x) / 2;
+    y = (y + prev_y) / 2;
 
+
+
+    if (abs32(x) < 150) x = 0;
+    if (abs32(y) < 150) y = 0;
+
+    prev_x = x;
+    prev_y = y;
+
+    int32_t left  = y - x;
+    int32_t right = y + x;
+
+
+
+    cmd[0] = (left >= 0) ? 1 : 0;
+    cmd[2] = (right >= 0) ? 1 : 0;
+
+    int32_t val_l = abs32(left) >> 3;
+    int32_t val_r = abs32(right) >> 3;
+
+    if (val_l > 255) val_l = 255;
+    if (val_r > 255) val_r = 255;
+
+    cmd[1] = (uint8_t)val_l;
+    cmd[3] = (uint8_t)val_r;
+
+    if (x == 0 && y == 0) {
+        cmd[1] = 0;
+        cmd[3] = 0;
+    }
 }
 /* USER CODE END 0 */
 
@@ -218,13 +234,13 @@ int main(void)
 
 	  HAL_ADC_Stop(&hadc1);
 
-	  //printf("X:%lu Y:%lu\r\n", adc_val1, adc_val2);
+	 //printf("X:%lu Y:%lu\r\n", adc_val1, adc_val2);
 
-	  //uint8_t cmd[4];
-	 // convertInput(adc_x, adc_y, cmd);
-	 // printf("Raw X: %lu, Raw Y: %lu\r\n", adc_x, adc_y);
+	  uint8_t cmd[4];
+	  convertInput(adc_x, adc_y, cmd);
+	  //printf("Raw X: %lu, Raw Y: %lu\r\n", adc_x, adc_y);
 
-	   uint8_t cmd[4] = {1, 0xFF, 1, 0xFF};
+	   //uint8_t cmd[4] = {1, 0xFF, 1, 0xFF};
 
 
 
@@ -344,7 +360,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_84CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
